@@ -1,5 +1,5 @@
 .venv/
 __pycache__/
-artifacts/
+!artifacts/tweets_cleaned.parquet
 .env
 poetry.lock   # optional to ignore lockfile, but generally commit it
