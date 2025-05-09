@@ -1,0 +1,18 @@
+# Core data‐processing & NLP
+polars>=0.20
+nltk>=3.8
+spacy>=3.5
+python-dotenv>=1.0
+
+# Embeddings & vector search
+sentence-transformers>=2.2
+numpy>=1.25
+faiss-cpu>=1.11.0
+
+# OpenAI & tokenization
+openai>=1.78.0
+tiktoken>=0.9.0
+
+# Web frontends
+streamlit>=1.45.0
+gradio>=5.29.0
