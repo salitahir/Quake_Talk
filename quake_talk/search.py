@@ -1,26 +1,30 @@
 # quake_talk/search.py
 
 import os
-import faiss
 import numpy as np
+import faiss
 from sentence_transformers import SentenceTransformer
+from functools import lru_cache
 
-# 1. Load your FAISS index once
-IDX = faiss.read_index(
-    os.getenv("INDEX_FILE", "artifacts/tweets.index"),
-    faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY
-)
+@lru_cache(maxsize=1)
+def _load_faiss_index(index_path: str = os.getenv("INDEX_FILE", "artifacts/tweets.index")) -> faiss.Index:
+    """Read & cache the FAISS index."""
+    return faiss.read_index(
+        index_path,
+        faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY
+    )
 
-# 2. Load the same embedding model
-EMODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-MODEL  = SentenceTransformer(EMODEL)
+@lru_cache(maxsize=1)
+def _load_embedding_model(name: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")) -> SentenceTransformer:
+    """Instantiate & cache the SentenceTransformer."""
+    return SentenceTransformer(name)
 
 def semantic_search(question: str, top_k: int = 10):
-    """
-    Returns the indices and distances of the top_k most similar tweets.
-    """
-    # 1. Encode and normalize
-    q_emb = MODEL.encode(question, normalize_embeddings=True).astype("float32")
-    # 2. Search FAISS
-    distances, indices = IDX.search(q_emb[None, :], top_k)
-    return indices[0], distances[0]
+        # 1) load (cached) model & index
+    model = _load_embedding_model()
+    idx   = _load_faiss_index()
+
+    # 2) encode & search
+    query_emb = model.encode(question)
+    distances, indices = idx.search(np.array([query_emb]), top_k)
+    return indices.flatten().tolist(), distances.flatten().tolist()
