@@ -33,7 +33,7 @@ df      = load_data()
 encoder = get_token_encoder(EMODEL)
 
 # Title + byline
-st.title("📰 Quake Talk")
+st.title("📰 Quake Talk 4.0")
 st.markdown(
     "<small>Developed & Deployed by "
     "<a href='https://www.linkedin.com/in/salitahir/' target='_blank'>Syed Ali Tahir</a></small>",
@@ -70,12 +70,11 @@ encoder = get_token_encoder(EMODEL)
 # ── Sidebar Widgets ───────────────────────────────────────────────
 st.sidebar.header("Filters & Options")
 
-# 1. Date range
-# 1a. Compute absolute min/max date range for the data
+# 1) Compute the absolute bounds of data
 min_d = df["date"].dt.date.min()
 max_d = df["date"].dt.date.max()
 
-# 1b. Ask for a date or a date‐range, defaulting to (min_d, max_d)
+# 2) Let the user pick a single date or a range
 raw_dates = st.sidebar.date_input(
     "Date range",
     value=(min_d, max_d),
@@ -83,19 +82,18 @@ raw_dates = st.sidebar.date_input(
     max_value=max_d,
 )
 
-# 1c. Normalize to two variables
+# 3) Normalize to two dates
 if isinstance(raw_dates, (tuple, list)) and len(raw_dates) == 2:
     start_date, end_date = raw_dates
 else:
-    # single date selected → treat it as both start & end
+    # If they’ve only clicked one day so far, use it for both ends
     start_date = end_date = raw_dates
 
-# 1d. Now safely filter
-mask = (
+# 4) Now it’s always safe to build your mask
+date_mask = (
     (df["date"].dt.date >= start_date)
     & (df["date"].dt.date <= end_date)
 )
-subset = df.loc[mask]
 
 # 2. Max sentences
 max_sents = st.sidebar.slider("Max sentences", 50, 1000, 300, 50)
