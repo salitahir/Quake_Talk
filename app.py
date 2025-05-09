@@ -1,17 +1,13 @@
 # app.py
-import os
 import streamlit as st
+import os
 import pandas as pd
 import polars as pl
 import tiktoken
 
 from quake_talk.search import semantic_search
-from quake_talk.gpt    import ask
-from quake_talk.preprocessing.clean_text import (
-    extract_sentences,
-    summarize_with_gpt4o,
-    extract_keywords,
-)
+from quake_talk.gpt    import ask, summarize_with_gpt4o
+from quake_talk.preprocessing.clean_text import extract_sentences, extract_keywords
 
 # ── Config & Constants ─────────────────────────────────────────────
 # Env‐driven default limit (from .env / .env.example)
@@ -19,21 +15,32 @@ MAX_CONTEXT_TOKENS_DEFAULT = int(os.getenv("MAX_CONTEXT_TOKENS", 8000))
 EMODEL                    = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
 # ── Caching ────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
+@st.cache_data
 def load_data() -> pd.DataFrame:
-    # Read once; convert to pandas for easy masking
     df = pl.read_parquet("artifacts/tweets_cleaned.parquet").to_pandas()
-
-    # Convert your existing 'date' column to datetime
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     return df
 
-@st.cache_resource(show_spinner=False)
+@st.cache_resource
 def get_token_encoder(model_name: str):
     try:
         return tiktoken.encoding_for_model(model_name)
     except Exception:
         return tiktoken.get_encoding("cl100k_base")
+
+# ── App start ──────────────────────────────────────────────────
+df      = load_data()
+encoder = get_token_encoder(EMODEL)
+
+# Title + byline
+st.title("📰 Quake Talk")
+st.markdown(
+    "<small>Developed & Deployed by "
+    "<a href='https://www.linkedin.com/in/salitahir/' target='_blank'>Syed Ali Tahir</a></small>",
+    unsafe_allow_html=True,
+)
+
+st.write("---")
 
 # ── Token‐based truncation ─────────────────────────────────────────
 def truncate_by_tokens(text: str, max_tokens: int, enc) -> str:
@@ -63,15 +70,32 @@ encoder = get_token_encoder(EMODEL)
 # ── Sidebar Widgets ───────────────────────────────────────────────
 st.sidebar.header("Filters & Options")
 
-# 1. Date range (now using 'date', not 'tweet_date')
+# 1. Date range
+# 1a. Compute absolute min/max date range for the data
 min_d = df["date"].dt.date.min()
 max_d = df["date"].dt.date.max()
-start_date, end_date = st.sidebar.date_input(
+
+# 1b. Ask for a date or a date‐range, defaulting to (min_d, max_d)
+raw_dates = st.sidebar.date_input(
     "Date range",
     value=(min_d, max_d),
     min_value=min_d,
     max_value=max_d,
 )
+
+# 1c. Normalize to two variables
+if isinstance(raw_dates, (tuple, list)) and len(raw_dates) == 2:
+    start_date, end_date = raw_dates
+else:
+    # single date selected → treat it as both start & end
+    start_date = end_date = raw_dates
+
+# 1d. Now safely filter
+mask = (
+    (df["date"].dt.date >= start_date)
+    & (df["date"].dt.date <= end_date)
+)
+subset = df.loc[mask]
 
 # 2. Max sentences
 max_sents = st.sidebar.slider("Max sentences", 50, 1000, 300, 50)
@@ -98,51 +122,68 @@ max_context_tokens = st.sidebar.number_input(
 )
 
 # ── Main UI ────────────────────────────────────────────────────────
-st.title("📰 Quake Talk Streamlit Demo")
+# Page title
 
-question = st.text_input("Ask a question about the Turkey–Syria tweets:")
+question = st.text_input("Ask a question about the 2023 Turkey–Syria Earthquake Tweets:")
+run      = st.button("Ask GPT-4o")
 
-if st.button("Ask GPT-4o"):
-    # 1) Date filter on your 'date' column
-    mask = (
-        (df["date"].dt.date >= start_date) &
-        (df["date"].dt.date <= end_date)
-    )
+if not run:
+    st.info("Enter a question above and click “Ask GPT-4o” to begin.")
+else:
+    # 1) filter by date
+    mask   = (df["date"].dt.date >= start_date) & (df["date"].dt.date <= end_date)
     subset = df.loc[mask]
 
     if subset.empty:
         st.warning("No tweets in that date range.")
     else:
-        # 2) Content filter
         if filter_method == "Semantic":
-            idxs, dists = semantic_search(question, top_k=max_sents)
-            subset = subset.reset_index(drop=True).iloc[idxs]
+            # 2a) Content filter
+            candidate_k = max_sents * 2
+            idxs, dists = semantic_search(question, top_k=candidate_k)
+
+            # 2b) keep only those hits whose original tweet is in the date window
+            valid = [i for i in idxs if mask.iat[i]]
+
+            # 2c) if nothing left, warn and skip further processing
+            if not valid:
+                st.warning("No semantically-relevant tweets in that date range.")
+                subset = subset.iloc[0:0]  # make it empty
+            else:
+                # 2d) trim to the real max_sents
+                valid = valid[:max_sents]
+                subset = df.iloc[valid]
         else:
-            kw = extract_keywords(question)
+            # your keyword branch unchanged
+            kw     = extract_keywords(question)
             subset = keyword_filter(subset, kw)
 
         if subset.empty:
             st.warning("No tweets matched your filter.")
         else:
-            texts = subset["content_clean"].tolist()
+            # 3) DataFrame view
+            with st.expander("📋 Show filtered tweets", expanded=False):
+                st.dataframe(subset, use_container_width=True)
 
-            # 3) Extract & truncate context
+            # 4) build context
+            texts   = subset["content_clean"].tolist()
             raw_ctx = " ".join(extract_sentences(texts, max_sents))
             ctx     = truncate_by_tokens(raw_ctx, max_context_tokens, encoder)
 
-            # 4) Optionally show raw context
+            # 5) Context expander
             if show_context:
-                st.markdown("**Context:**")
-                st.write(raw_ctx)
+                with st.expander("🔍 Show Context", expanded=False):
+                    st.write(raw_ctx)
 
-            # 5) Optionally generate summary
+            # 6) Summary expander
             if generate_summary:
-                with st.spinner("Generating summary…"):
-                    summ = summarize_with_gpt4o(ctx)
-                st.markdown("**Summary:**")
-                st.write(summ)
+                with st.expander("📝 Generate Summary", expanded=False):
+                    with st.spinner("Summarizing…"):
+                        summ = summarize_with_gpt4o(ctx)
+                    st.markdown("**Summary:**")
+                    st.write(summ)
 
-            # 6) Ask GPT
+            # 7) Final answer
             with st.spinner("Querying GPT-4o…"):
                 answer = ask(question, ctx, temperature=temperature)
             st.markdown("**Answer:**")

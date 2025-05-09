@@ -27,7 +27,8 @@ from nltk.tokenize import sent_tokenize
 nltk.download("stopwords", quiet=True)
 nltk.download("wordnet", quiet=True)
 nltk.download("omw-1.4", quiet=True)
-nltk.download("punkt", quiet=True)  
+nltk.download("punkt", quiet=True)
+nltk.download("punkt_tab", quiet=True)  
 
 STOPWORDS = set(stopwords.words("english"))
 NLTK_LEMMATIZER = WordNetLemmatizer()
@@ -59,8 +60,8 @@ def clean_tweet(
     text = re.sub(r"http\S+|www\S+", "", text)
     text = re.sub(r"\S*@\S*", "", text)
 
-    # 4. Keep only desired chars
-    text = re.sub(r"[^a-zA-Z0-9\s\.,!?'\"]", "", text)
+    # 4. Remove all punctuation (leave only letters, numbers, whitespace)
+    text = re.sub(r"[^a-zA-Z0-9\s]", "", text)
 
     # 5. Normalize whitespace
     text = re.sub(r"\s+", " ", text).strip()

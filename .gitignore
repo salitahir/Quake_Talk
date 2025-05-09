@@ -1,5 +1,7 @@
 .venv/
 __pycache__/
 !artifacts/tweets_cleaned.parquet
+!artifacts/tweet_embeddings.npy
 .env
 poetry.lock   # optional to ignore lockfile, but generally commit it
+test_app_pipeline.py    # ignore local smoke-tests

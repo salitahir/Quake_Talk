@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "quake-talk"
+version = "0.1.0"
+description = "Social media analysis pipeline Phase 1: text cleaning"
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+polars = "^0.20"
+nltk = "^3.8"
+spacy = "^3.5"
+python-dotenv = "^1.0"
+sentence-transformers = "^2.2"
+numpy                 = "^1.25"
+faiss-cpu = "^1.11.0"
+openai = "^1.78.0"
+streamlit = "^1.45.0"
+gradio = "^5.29.0"
+tiktoken = "^0.9.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

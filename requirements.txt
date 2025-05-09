@@ -1,0 +1,4 @@
+polars>=0.20
+nltk>=3.8
+spacy>=3.5
+python-dotenv>=1.0
