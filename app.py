@@ -77,7 +77,7 @@ st.markdown(
       disaster contexts and beyond. Quake Talk uses both keyword and semantic
       filtering to mine relevant context from user-generated social media data
       relating to the 2023 Turkey–Syria earthquake through a dynamic and
-      interactive interface.
+      interactive prototype application.
     </div>
     """,
     unsafe_allow_html=True,
